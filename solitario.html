@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Solitario degli Elementi Chimici</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Fira+Code:wght@500;700&display=swap');
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%);
+      color: #f8fafc;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 4px;
+    }
+
+    /* Glow Effects & Card Styles */
+    .element-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      font-family: 'Fira Code', monospace;
+      touch-action: none;
+    }
+
+    .element-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px var(--glow-color, rgba(255,255,255,0.2));
+    }
+
+    .element-card.selected {
+      transform: translateY(-8px) scale(1.05);
+      box-shadow: 0 0 20px 4px #38bdf8 !important;
+      border-color: #38bdf8 !important;
+      z-index: 50 !important;
+    }
+
+    .element-card.hint-highlight {
+      animation: pulse-glow 1.2s infinite alternate;
+      border-color: #facc15 !important;
+    }
+
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 5px #facc15; }
+      100% { box-shadow: 0 0 22px #facc15; transform: scale(1.04); }
+    }
+
+    .drop-target {
+      border-color: #34d399 !important;
+      background-color: rgba(52, 211, 153, 0.15) !important;
+      box-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
+    }
+
+    /* Categories Custom Theme Colors */
+    .cat-nonmetalli {
+      --glow-color: rgba(56, 189, 248, 0.4);
+      border-color: #0284c7;
+      background: linear-gradient(135deg, rgba(14, 116, 144, 0.85), rgba(8, 47, 73, 0.95));
+    }
+    .badge-nonmetalli { background-color: #0284c7; color: #e0f2fe; }
+
+    .cat-alcalini {
+      --glow-color: rgba(248, 113, 113, 0.4);
+      border-color: #dc2626;
+      background: linear-gradient(135deg, rgba(185, 28, 28, 0.85), rgba(69, 10, 10, 0.95));
+    }
+    .badge-alcalini { background-color: #dc2626; color: #fee2e2; }
+
+    .cat-transizione {
+      --glow-color: rgba(251, 146, 60, 0.4);
+      border-color: #ea580c;
+      background: linear-gradient(135deg, rgba(194, 65, 12, 0.85), rgba(67, 20, 7, 0.95));
+    }
+    .badge-transizione { background-color: #ea580c; color: #ffedd5; }
+
+    .cat-alogeni {
+      --glow-color: rgba(168, 85, 247, 0.4);
+      border-color: #9333ea;
+      background: linear-gradient(135deg, rgba(126, 34, 206, 0.85), rgba(58, 12, 99, 0.95));
+    }
+    .badge-alogeni { background-color: #9333ea; color: #f3e8ff; }
+
+    .cat-gasnobili {
+      --glow-color: rgba(250, 204, 21, 0.4);
+      border-color: #ca8a04;
+      background: linear-gradient(135deg, rgba(161, 98, 7, 0.85), rgba(66, 32, 6, 0.95));
+    }
+    .badge-gasnobili { background-color: #ca8a04; color: #fef9c3; }
+
+    /* Column Overlap Layout for Cards */
+    .card-stack {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+    .card-stack > .element-card {
+      margin-top: -3.8rem;
+    }
+    .card-stack > .element-card:first-child {
+      margin-top: 0;
+    }
+
+    @media (max-width: 640px) {
+      .card-stack > .element-card {
+        margin-top: -3.2rem;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden bg-slate-900 text-slate-100">
+
+  <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+      
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 shadow-lg shadow-emerald-500/10">
+          <i class="fa-solid fa-vial-virus text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+            Solitario degli Elementi
+          </h1>
+          <p class="text-xs text-slate-400 font-medium">Laboratorio di Chimica Carte</p>
+        </div>
+      </div>
+
+      <!-- Stats Bar -->
+      <div class="flex items-center space-x-4 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700/60 shadow-inner text-sm">
+        <div class="flex items-center space-x-1.5" title="Tempo trascorso">
+          <i class="fa-regular fa-clock text-cyan-400"></i>
+          <span id="timer-display" class="font-mono font-bold text-slate-200">00:00</span>
+        </div>
+        <div class="h-4 w-px bg-slate-700"></div>
+        <div class="flex items-center space-x-1.5" title="Mosse effettuate">
+          <i class="fa-solid fa-shoe-prints text-amber-400"></i>
+          <span id="moves-display" class="font-mono font-bold text-slate-200">0</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2">
+        <button id="btn-undo" onclick="undoMove()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed" title="Annulla ultima mossa">
+          <i class="fa-solid fa-rotate-left"></i> Annulla
+        </button>
+        <button id="btn-hint" onclick="provideHint()" class="px-3 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-semibold transition flex items-center gap-1.5" title="Mostra una mossa disponibile">
+          <i class="fa-regular fa-lightbulb"></i> Aiuto
+        </button>
+        <button onclick="confirmNewGame()" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrows-rotate"></i> Nuova
+        </button>
+        <button onclick="toggleModal('help-modal')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition" title="Regole di Gioco">
+          <i class="fa-solid fa-circle-info text-lg"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto w-full px-2 sm:px-4 py-4 flex-1 flex flex-col gap-6">
+
+    <!-- Top Area: Foundations (Target Drop zones by category) -->
+    <section class="w-full bg-slate-800/40 border border-slate-700/50 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-sm">
+      <div class="flex items-center justify-between mb-2 px-1">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <i class="fa-solid fa-atom text-emerald-400"></i> Fondazioni per Categoria Chimica (Ordina per Z Crescente)
+        </h2>
+        <button onclick="toggleModal('legend-modal')" class="text-xs text-cyan-400 hover:underline flex items-center gap-1">
+          <i class="fa-solid fa-palette"></i> Legenda Categorie
+        </button>
+      </div>
+
+      <div class="grid grid-cols-5 gap-2 sm:gap-4" id="foundations-container">
+        <!-- 5 Foundation Slots injected via JS -->
+      </div>
+    </section>
+
+    <!-- Bottom Area: Tableaux / Columns (5 Columns) -->
+    <section class="w-full flex-1 min-h-[380px] grid grid-cols-5 gap-2 sm:gap-4 items-start" id="columns-container">
+      <!-- 5 Columns injected via JS -->
+    </section>
+
+  </main>
+
+  <footer class="bg-slate-950/80 border-t border-slate-800/80 py-3 text-center text-xs text-slate-500">
+    <p>Solitario degli Elementi Chimici &bull; Organizza la Tavola Periodica in colonne e fondazioni.</p>
+  </footer>
+
+  <!-- Modale Guida / Come Giocare -->
+  <div id="help-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
+      <button onclick="toggleModal('help-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-xl"></i>
+      </button>
+
+      <h3 class="text-xl font-bold text-emerald-400 mb-3 flex items-center gap-2">
+        <i class="fa-solid fa-book-open"></i> Regole del Solitario Chimico
+      </h3>
+
+      <div class="space-y-3 text-sm text-slate-300 leading-relaxed overflow-y-auto max-h-[70vh] pr-2">
+        <p>L'obiettivo è spostare tutti gli elementi nelle **5 Fondazioni in alto**, ciascuna dedicata ad una specifica famiglia chimica, in ordine di **Numero Atomico (Z) crescente**.</p>
+        
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+          <h4 class="font-semibold text-slate-200 mb-1">Regole per spostare tra le Colonne:</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-300 text-xs sm:text-sm">
+            <li>Puoi posizionare una carta sopra un'altra se appartengono alla **stessa Famiglia Chimica**.</li>
+            <li>OPPURE se i loro Numeri Atomici sono **consecutivi** (es. Z=6 sopra Z=7 o Z=5).</li>
+            <li>Puoi selezionare e muovere le carte singolarmente oppure gruppi di carte già valide in sequenza.</li>
+            <li>Un campo colonna vuoto può accogliere qualsiasi carta libera.</li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+          <h4 class="font-semibold text-slate-200 mb-1">Regole per le Fondazioni (In alto):</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-300 text-xs sm:text-sm">
+            <li>Accettano unicamente elementi della **categoria corrispondente**.</li>
+            <li>Le carte devono essere inserite in **ordine di Numero Atomico (Z)** crescente.</li>
+          </ul>
+        </div>
+
+        <p class="text-xs text-slate-400 italic">
+          Suggerimento: Clicca una carta per selezionarla e poi clicca sulla destinazione, oppure trascina la carta direttamente con il Drag & Drop!
+        </p>
+      </div>
+
+      <div class="mt-5 text-right">
+        <button onclick="toggleModal('help-modal')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition">
+          Ho capito, gioca!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale Legenda Categorie -->
+  <div id="legend-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+      <button onclick="toggleModal('legend-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-xl"></i>
+      </button>
+
+      <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-palette"></i> Legenda Categorie Chimiche
+      </h3>
+
+      <div class="space-y-3" id="legend-list">
+        <!-- JS dynamically fills categories -->
+      </div>
+
+      <div class="mt-6 text-right">
+        <button onclick="toggleModal('legend-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-semibold transition">
+          Chiudi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale Vittoria -->
+  <div id="victory-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md hidden p-4">
+    <div class="bg-slate-900 border-2 border-emerald-500 rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center relative overflow-hidden">
+      <div class="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl"></div>
+      
+      <div class="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400 text-3xl shadow-lg shadow-emerald-500/20">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+
+      <h3 class="text-3xl font-extrabold text-white mb-2">Esperimento Riuscito!</h3>
+      <p class="text-slate-300 text-sm mb-6">Hai organizzato con successo tutti gli elementi chimici nelle rispettive famiglie!</p>
+
+      <div class="grid grid-cols-2 gap-4 bg-slate-800/60 p-4 rounded-2xl border border-slate-700 mb-6">
+        <div>
+          <span class="block text-xs text-slate-400 uppercase font-semibold">Tempo Impiegato</span>
+          <span id="final-time" class="text-xl font-bold text-cyan-400 font-mono">00:00</span>
+        </div>
+        <div>
+          <span class="block text-xs text-slate-400 uppercase font-semibold">Mosse Totali</span>
+          <span id="final-moves" class="text-xl font-bold text-amber-400 font-mono">0</span>
+        </div>
+      </div>
+
+      <button onclick="toggleModal('victory-modal'); initGame();" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition text-base">
+        <i class="fa-solid fa-play mr-2"></i> Gioca un'Altra Partita
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. DATA DEFINITIONS (30 Elements across 5 Chemical Categories)
+       ========================================================================== */
+    const CATEGORIES = {
+      NONMETALLI: { id: 'nonmetalli', name: 'Non-Metalli', cssClass: 'cat-nonmetalli', badgeClass: 'badge-nonmetalli', icon: 'fa-flask' },
+      ALCALINI: { id: 'alcalini', name: 'Metalli Alcalini/Alcalino-Terrosi', cssClass: 'cat-alcalini', badgeClass: 'badge-alcalini', icon: 'fa-fire' },
+      TRANSIZIONE: { id: 'transizione', name: 'Metalli di Transizione', cssClass: 'cat-transizione', badgeClass: 'badge-transizione', icon: 'fa-cubes' },
+      ALOGENI: { id: 'alogeni', name: 'Alogeni', cssClass: 'cat-alogeni', badgeClass: 'badge-alogeni', icon: 'fa-skull-crossbones' },
+      GASNOBILI: { id: 'gasnobili', name: 'Gas Nobili', cssClass: 'cat-gasnobili', badgeClass: 'badge-gasnobili', icon: 'fa-wind' }
+    };
+
+    const ELEMENTS_DATA = [
+      // Non-Metalli (6 elements)
+      { z: 1, symbol: 'H', name: 'Idrogeno', category: CATEGORIES.NONMETALLI.id },
+      { z: 6, symbol: 'C', name: 'Carbonio', category: CATEGORIES.NONMETALLI.id },
+      { z: 7, symbol: 'N', name: 'Azoto', category: CATEGORIES.NONMETALLI.id },
+      { z: 8, symbol: 'O', name: 'Ossigeno', category: CATEGORIES.NONMETALLI.id },
+      { z: 15, symbol: 'P', name: 'Fosforo', category: CATEGORIES.NONMETALLI.id },
+      { z: 16, symbol: 'S', name: 'Zolfo', category: CATEGORIES.NONMETALLI.id },
+
+      // Metalli Alcalini / Alcalino-Terrosi (6 elements)
+      { z: 3, symbol: 'Li', name: 'Litio', category: CATEGORIES.ALCALINI.id },
+      { z: 4, symbol: 'Be', name: 'Berillio', category: CATEGORIES.ALCALINI.id },
+      { z: 11, symbol: 'Na', name: 'Sodio', category: CATEGORIES.ALCALINI.id },
+      { z: 12, symbol: 'Mg', name: 'Magnesio', category: CATEGORIES.ALCALINI.id },
+      { z: 19, symbol: 'K', name: 'Potassio', category: CATEGORIES.ALCALINI.id },
+      { z: 20, symbol: 'Ca', name: 'Calcio', category: CATEGORIES.ALCALINI.id },
+
+      // Metalli di Transizione / Altri Metalli (6 elements)
+      { z: 13, symbol: 'Al', name: 'Alluminio', category: CATEGORIES.TRANSIZIONE.id },
+      { z: 22, symbol: 'Ti', name: 'Titanio', category: CATEGORIES.TRANSIZIONE.id },
+      { z: 26, symbol: 'Fe', name: 'Ferro', category: CATEGORIES.TRANSIZIONE.id },
+      { z: 28, symbol: 'Ni', name: 'Nichel', category: CATEGORIES.TRANSIZIONE.id },
+      { z: 29, symbol: 'Cu', name: 'Rame', category: CATEGORIES.TRANSIZIONE.id },
+      { z: 30, symbol: 'Zn', name: 'Zinco', category: CATEGORIES.TRANSIZIONE.id },
+
+      // Alogeni (6 elements)
+      { z: 9, symbol: 'F', name: 'Fluoro', category: CATEGORIES.ALOGENI.id },
+      { z: 17, symbol: 'Cl', name: 'Cloro', category: CATEGORIES.ALOGENI.id },
+      { z: 35, symbol: 'Br', name: 'Bromo', category: CATEGORIES.ALOGENI.id },
+      { z: 53, symbol: 'I', name: 'Iodio', category: CATEGORIES.ALOGENI.id },
+      { z: 85, symbol: 'At', name: 'Astato', category: CATEGORIES.ALOGENI.id },
+      { z: 117, symbol: 'Ts', name: 'Tennessinio', category: CATEGORIES.ALOGENI.id },
+
+      // Gas Nobili (6 elements)
+      { z: 2, symbol: 'He', name: 'Elio', category: CATEGORIES.GASNOBILI.id },
+      { z: 10, symbol: 'Ne', name: 'Neon', category: CATEGORIES.GASNOBILI.id },
+      { z: 18, symbol: 'Ar', name: 'Argon', category: CATEGORIES.GASNOBILI.id },
+      { z: 36, symbol: 'Kr', name: 'Cripton', category: CATEGORIES.GASNOBILI.id },
+      { z: 54, symbol: 'Xe', name: 'Xenon', category: CATEGORIES.GASNOBILI.id },
+      { z: 86, symbol: 'Rn', name: 'Radon', category: CATEGORIES.GASNOBILI.id }
+    ];
+
+    /* ==========================================================================
+       2. GAME STATE MANAGEMENT
+       ========================================================================== */
+    let columns = [[], [], [], [], []];
+    let foundations = {
+      nonmetalli: [],
+      alcalini: [],
+      transizione: [],
+      alogeni: [],
+      gasnobili: []
+    };
+
+    let selectedSource = null; // { type: 'column'|'foundation', index: number, cardIndex?: number }
+    let movesHistory = [];
+    let moveCount = 0;
+    let timerSeconds = 0;
+    let timerInterval = null;
+    let gameActive = false;
+
+    // Touch / Drag & Drop support variables
+    let draggedCardData = null;
+
+    window.onload = () => {
+      buildLegend();
+      initGame();
+    };
+
+    function buildLegend() {
+      const container = document.getElementById('legend-list');
+      container.innerHTML = '';
+      Object.values(CATEGORIES).forEach(cat => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-3 bg-slate-800 rounded-xl border border-slate-700';
+        div.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg ${cat.badgeClass} flex items-center justify-center font-bold">
+              <i class="fa-solid ${cat.icon}"></i>
+            </div>
+            <span class="font-semibold text-slate-200 text-sm">${cat.name}</span>
+          </div>
+          <span class="text-xs text-slate-400">6 Elementi</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function initGame() {
+      // Reset state
+      columns = [[], [], [], [], []];
+      foundations = { nonmetalli: [], alcalini: [], transizione: [], alogeni: [], gasnobili: [] };
+      selectedSource = null;
+      movesHistory = [];
+      moveCount = 0;
+      timerSeconds = 0;
+      gameActive = true;
+
+      updateStatsDisplay();
+      startTimer();
+
+      // Shuffle Cards
+      const shuffled = [...ELEMENTS_DATA].sort(() => Math.random() - 0.5);
+
+      // Deal 30 cards into 5 columns (6 cards each)
+      for (let i = 0; i < shuffled.length; i++) {
+        const colIdx = i % 5;
+        columns[colIdx].push(shuffled[i]);
+      }
+
+      renderBoard();
+    }
+
+    /* ==========================================================================
+       3. TIMER & STATS MANAGEMENT
+       ========================================================================== */
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!gameActive) return;
+        timerSeconds++;
+        const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+        const secs = String(timerSeconds % 60).padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function updateStatsDisplay() {
+      document.getElementById('moves-display').textContent = moveCount;
+      document.getElementById('btn-undo').disabled = movesHistory.length === 0;
+    }
+
+    /* ==========================================================================
+       4. RENDERING ENGINE
+       ========================================================================== */
+    function renderBoard() {
+      renderFoundations();
+      renderColumns();
+      clearHighlights();
+    }
+
+    function renderFoundations() {
+      const container = document.getElementById('foundations-container');
+      container.innerHTML = '';
+
+      const catKeys = Object.keys(CATEGORIES);
+      catKeys.forEach((key) => {
+        const cat = CATEGORIES[key];
+        const cards = foundations[cat.id];
+        const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
+
+        const slot = document.createElement('div');
+        slot.className = `foundation-slot min-h-[110px] sm:min-h-[130px] rounded-xl border-2 border-dashed border-slate-700 bg-slate-800/30 flex flex-col items-center justify-center relative p-1.5 transition cursor-pointer`;
+        slot.dataset.foundationId = cat.id;
+
+        // Interaction events
+        slot.onclick = () => handleFoundationClick(cat.id);
+        slot.ondragover = (e) => handleDragOver(e);
+        slot.ondrop = (e) => handleDrop(e, 'foundation', cat.id);
+
+        if (topCard) {
+          slot.appendChild(createCardElement(topCard, { isFoundation: true, catId: cat.id }));
+        } else {
+          slot.innerHTML = `
+            <i class="fa-solid ${cat.icon} text-xl sm:text-2xl text-slate-600 mb-1"></i>
+            <span class="text-[10px] sm:text-xs font-bold text-slate-500 text-center uppercase tracking-wider">${cat.name.split('/')[0]}</span>
+            <span class="text-[9px] text-slate-600">0 / 6</span>
+          `;
+        }
+
+        container.appendChild(slot);
+      });
+    }
+
+    function renderColumns() {
+      const container = document.getElementById('columns-container');
+      container.innerHTML = '';
+
+      columns.forEach((colCards, colIdx) => {
+        const colDiv = document.createElement('div');
+        colDiv.className = `tableau-column min-h-[380px] bg-slate-800/20 rounded-2xl border border-slate-800/80 p-1.5 sm:p-2 flex flex-col gap-0 card-stack relative transition`;
+        colDiv.dataset.colIndex = colIdx;
+
+        colDiv.ondragover = (e) => handleDragOver(e);
+        colDiv.ondrop = (e) => handleDrop(e, 'column', colIdx);
+
+        // Click on empty column space
+        colDiv.onclick = (e) => {
+          if (e.target === colDiv && selectedSource) {
+            executeMove(selectedSource, { type: 'column', index: colIdx });
+          }
+        };
+
+        if (colCards.length === 0) {
+          const emptyMarker = document.createElement('div');
+          emptyMarker.className = 'w-full h-28 border-2 border-dashed border-slate-700/60 rounded-xl flex items-center justify-center text-slate-600 text-xs font-semibold';
+          emptyMarker.textContent = 'Vuoto';
+          colDiv.appendChild(emptyMarker);
+        } else {
+          colCards.forEach((card, cardIdx) => {
+            const isSelected = selectedSource && 
+                               selectedSource.type === 'column' && 
+                               selectedSource.index === colIdx && 
+                               selectedSource.cardIndex === cardIdx;
+
+            const cardEl = createCardElement(card, {
+              isFoundation: false,
+              colIdx: colIdx,
+              cardIdx: cardIdx,
+              isSelected: isSelected
+            });
+
+            colDiv.appendChild(cardEl);
+          });
+        }
+
+        container.appendChild(colDiv);
+      });
+    }
+
+    function createCardElement(card, meta) {
+      const catConfig = Object.values(CATEGORIES).find(c => c.id === card.category);
+      const cardDiv = document.createElement('div');
+
+      cardDiv.className = `element-card relative w-full h-28 sm:h-32 rounded-xl p-2 sm:p-2.5 border-2 shadow-lg cursor-pointer select-none flex flex-col justify-between ${catConfig.cssClass}`;
+      if (meta.isSelected) cardDiv.classList.add('selected');
+
+      // Card Content
+      cardDiv.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="text-xs sm:text-sm font-bold font-mono text-slate-200/90">${card.z}</span>
+          <span class="text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${catConfig.badgeClass}">
+            ${catConfig.name.substring(0, 3)}
+          </span>
+        </div>
+        <div class="text-center my-auto">
+          <span class="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-md">${card.symbol}</span>
+        </div>
+        <div class="text-center">
+          <span class="text-[10px] sm:text-xs font-medium text-slate-200 truncate block">${card.name}</span>
+        </div>
+      `;
+
+      // Enable Drag
+      cardDiv.draggable = true;
+
+      // Click Event
+      cardDiv.onclick = (e) => {
+        e.stopPropagation();
+        handleCardClick(meta);
+      };
+
+      // Drag Events
+      cardDiv.ondragstart = (e) => {
+        draggedCardData = meta;
+        e.dataTransfer.setData('text/plain', JSON.stringify(meta));
+        e.dataTransfer.effectAllowed = 'move';
+      };
+
+      return cardDiv;
+    }
+
+    /* ==========================================================================
+       5. GAME RULES & MOVE VALIDATION LOGIC
+       ========================================================================== */
+    function canMoveToColumn(targetColIndex, movingCards) {
+      const targetCol = columns[targetColIndex];
+      if (targetCol.length === 0) return true; // Empty column can take any card sequence
+
+      const topTargetCard = targetCol[targetCol.length - 1];
+      const bottomMovingCard = movingCards[0];
+
+      // Rule 1: Same Chemical Family
+      const isSameCategory = topTargetCard.category === bottomMovingCard.category;
+
+      // Rule 2: Consecutive Atomic Number (Z - 1 or Z + 1)
+      const isConsecutiveZ = Math.abs(topTargetCard.z - bottomMovingCard.z) === 1;
+
+      return isSameCategory || isConsecutiveZ;
+    }
+
+    function canMoveToFoundation(targetCatId, card) {
+      if (card.category !== targetCatId) return false;
+
+      const foundationStack = foundations[targetCatId];
+      if (foundationStack.length === 0) return true; // First card of category
+
+      // Must be in strictly ascending Atomic Number Z
+      const topCard = foundationStack[foundationStack.length - 1];
+      return card.z > topCard.z;
+    }
+
+    /* ==========================================================================
+       6. INTERACTION HANDLERS (CLICK & DRAG)
+       ========================================================================== */
+    function handleCardClick(meta) {
+      clearHighlights();
+
+      if (meta.isFoundation) {
+        // Foundation card clicked - select it or do nothing
+        selectedSource = null;
+        renderBoard();
+        return;
+      }
+
+      const { colIdx, cardIdx } = meta;
+
+      // If no card is currently selected, select this card (and rest of stack if valid)
+      if (!selectedSource) {
+        selectedSource = { type: 'column', index: colIdx, cardIndex: cardIdx };
+        renderBoard();
+        return;
+      }
+
+      // If clicking on the same card, deselect
+      if (selectedSource.type === 'column' && selectedSource.index === colIdx && selectedSource.cardIndex === cardIdx) {
+        selectedSource = null;
+        renderBoard();
+        return;
+      }
+
+      // Try executing move to this column
+      executeMove(selectedSource, { type: 'column', index: colIdx });
+    }
+
+    function handleFoundationClick(catId) {
+      if (!selectedSource) return;
+      executeMove(selectedSource, { type: 'foundation', catId: catId });
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDrop(e, targetType, targetId) {
+      e.preventDefault();
+      if (!draggedCardData) return;
+
+      const source = {
+        type: 'column',
+        index: draggedCardData.colIdx,
+        cardIndex: draggedCardData.cardIdx
+      };
+
+      const destination = targetType === 'column' ? 
+        { type: 'column', index: targetId } : 
+        { type: 'foundation', catId: targetId };
+
+      executeMove(source, destination);
+      draggedCardData = null;
+    }
+
+    /* ==========================================================================
+       7. MOVE EXECUTION & UNDO SYSTEM
+       ========================================================================== */
+    function executeMove(source, destination) {
+      if (source.type !== 'column') return;
+
+      const sourceCol = columns[source.index];
+      const movingCards = sourceCol.slice(source.cardIndex);
+
+      if (movingCards.length === 0) return;
+
+      // Check validation based on destination type
+      if (destination.type === 'column') {
+        if (source.index === destination.index) {
+          selectedSource = null;
+          renderBoard();
+          return;
+        }
+
+        if (canMoveToColumn(destination.index, movingCards)) {
+          // Perform Move
+          saveStateForUndo();
+          const moved = columns[source.index].splice(source.cardIndex);
+          columns[destination.index].push(...moved);
+          moveCount++;
+          selectedSource = null;
+          updateStatsDisplay();
+          renderBoard();
+          checkVictory();
+        } else {
+          flashError();
+        }
+      } else if (destination.type === 'foundation') {
+        // Can only move ONE card at a time to Foundation
+        if (movingCards.length === 1) {
+          const card = movingCards[0];
+          if (canMoveToFoundation(destination.catId, card)) {
+            saveStateForUndo();
+            const movedCard = columns[source.index].pop();
+            foundations[destination.catId].push(movedCard);
+            moveCount++;
+            selectedSource = null;
+            updateStatsDisplay();
+            renderBoard();
+            checkVictory();
+          } else {
+            flashError();
+          }
+        } else {
+          flashError(); // Cannot move stacked cards to foundation
+        }
+      }
+    }
+
+    function saveStateForUndo() {
+      const stateCopy = {
+        columns: JSON.parse(JSON.stringify(columns)),
+        foundations: JSON.parse(JSON.stringify(foundations))
+      };
+      movesHistory.push(stateCopy);
+    }
+
+    function undoMove() {
+      if (movesHistory.length === 0) return;
+      const previousState = movesHistory.pop();
+      columns = previousState.columns;
+      foundations = previousState.foundations;
+      selectedSource = null;
+      moveCount = Math.max(0, moveCount - 1);
+      updateStatsDisplay();
+      renderBoard();
+    }
+
+    function flashError() {
+      selectedSource = null;
+      renderBoard();
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.hint-highlight').forEach(el => el.classList.remove('hint-highlight'));
+    }
+
+    /* ==========================================================================
+       8. HINT ENGINE
+       ========================================================================== */
+    function provideHint() {
+      clearHighlights();
+
+      // 1. Check if any column top card can move to Foundations
+      for (let c = 0; c < 5; c++) {
+        const col = columns[c];
+        if (col.length > 0) {
+          const topCard = col[col.length - 1];
+          if (canMoveToFoundation(topCard.category, topCard)) {
+            highlightFoundation(topCard.category);
+            highlightColumnCard(c, col.length - 1);
+            return;
+          }
+        }
+      }
+
+      // 2. Check if any valid column to column move exists
+      for (let sourceCol = 0; sourceCol < 5; sourceCol++) {
+        const sCol = columns[sourceCol];
+        if (sCol.length === 0) continue;
+
+        for (let cardIdx = 0; cardIdx < sCol.length; cardIdx++) {
+          const movingCards = sCol.slice(cardIdx);
+
+          for (let targetCol = 0; targetCol < 5; targetCol++) {
+            if (sourceCol === targetCol) continue;
+            if (canMoveToColumn(targetCol, movingCards)) {
+              // Avoid moving entire stack to empty column if it changes nothing
+              if (columns[targetCol].length === 0 && cardIdx === 0) continue;
+
+              highlightColumnCard(sourceCol, cardIdx);
+              highlightColumnCard(targetCol, columns[targetCol].length - 1);
+              return;
+            }
+          }
+        }
+      }
+
+      // No move found
+      const btnHint = document.getElementById('btn-hint');
+      const origText = btnHint.innerHTML;
+      btnHint.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Nessuna mossa!`;
+      setTimeout(() => { btnHint.innerHTML = origText; }, 2000);
+    }
+
+    function highlightColumnCard(colIdx, cardIdx) {
+      const colDiv = document.querySelector(`.tableau-column[data-col-index="${colIdx}"]`);
+      if (colDiv) {
+        const cardEls = colDiv.querySelectorAll('.element-card');
+        if (cardEls[cardIdx]) {
+          cardEls[cardIdx].classList.add('hint-highlight');
+        }
+      }
+    }
+
+    function highlightFoundation(catId) {
+      const slot = document.querySelector(`.foundation-slot[data-foundation-id="${catId}"]`);
+      if (slot) slot.classList.add('hint-highlight');
+    }
+
+    /* ==========================================================================
+       9. VICTORY CHECK & UTILITIES
+       ========================================================================== */
+    function checkVictory() {
+      let totalInFoundations = 0;
+      Object.values(foundations).forEach(stack => {
+        totalInFoundations += stack.length;
+      });
+
+      if (totalInFoundations === 30) {
+        gameActive = false;
+        if (timerInterval) clearInterval(timerInterval);
+
+        document.getElementById('final-time').textContent = document.getElementById('timer-display').textContent;
+        document.getElementById('final-moves').textContent = moveCount;
+
+        toggleModal('victory-modal');
+
+        // Launch Confetti
+        try {
+          confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        } catch (e) {
+          // Fallback if confetti fails
+        }
+      }
+    }
+
+    function confirmNewGame() {
+      if (moveCount > 0 && gameActive) {
+        if (confirm("Vuoi iniziare una nuova partita? I progressi attuali andranno persi.")) {
+          initGame();
+        }
+      } else {
+        initGame();
+      }
+    }
+
+    function toggleModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.toggle('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
